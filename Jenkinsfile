@@ -1,35 +1,36 @@
 pipeline {
-    agent any 
-    
+    agent { label "test" }
+	environment {
+		DOCKERHUB_CREDS=credentials('dockerHub')
+	}
     stages{
         stage("Clone Code"){
-            steps {
-                echo "Cloning the code"
-                git url:"https://github.com/AnupamRoy2191/django-notes-app.git", branch: "main"
+            steps{
+                git url: "https://github.com/AnupamRoy2191/django-notes-app.git", branch: "main"
             }
         }
         stage("Build"){
-            steps {
-                echo "Building the image"
-                sh "docker build -t my-note-app ."
-            }
+            steps{
+                sh "docker build . -t $DOCKERHUB_CREDS_USR/my-note-app:latest"
+           	 }
         }
         stage("Push to Docker Hub"){
-            steps {
-                echo "Pushing the image to docker hub"
-                withCredentials([usernamePassword(credentialsId:"dockerHub",passwordVariable:"dockerHubPass",usernameVariable:"dockerHubUser")]){
-                sh "docker tag my-note-app ${env.dockerHubUser}/my-note-app:latest"
-                sh "docker login -u ${env.dockerHubUser} -p ${env.dockerHubPass}"
-                sh "docker push ${env.dockerHubUser}/my-note-app:latest"
+            steps{
+                sh "docker login -u $DOCKERHUB_CREDS_USR -p '$DOCKERHUB_CREDS_PSW'"
+                sh "docker push $DOCKERHUB_CREDS_USR/my-note-app:latest"
                 }
             }
-        }
         stage("Deploy"){
-            steps {
-                echo "Deploying the container"
+            steps{
                 sh "docker-compose down && docker-compose up -d"
-                
             }
         }
     }
+    post{
+  	always {
+    		echo "cleaning up all dangling images"
+		sh 'docker rmi $(docker images -f dangling=true -q)'
+  }
+}
+
 }
